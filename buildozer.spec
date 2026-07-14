@@ -3,6 +3,7 @@ title = TITAN Admin
 package.name = titanadmin
 package.domain = org.titan.admin
 
+source.dir = .
 source.main = admin.py
 source.include_exts = py,png,jpg,kv,atlas,json
 
