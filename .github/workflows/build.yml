@@ -31,6 +31,12 @@ jobs:
         echo "BUILDOZER_ALLOW_ROOT=1" >> $GITHUB_ENV
         echo "ANDROID_SDK_ACCEPT_LICENSES=true" >> $GITHUB_ENV
 
+    - name: Accept Android SDK licenses
+      run: |
+        export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
+
     - name: Build APK
       run: buildozer -v android debug
 
