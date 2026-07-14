@@ -1,47 +1,132 @@
 name: Build TITAN Admin APK
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main, master ]
-  workflow_dispatch:
 
 jobs:
   build-apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Free disk space
       run: |
-        python -m pip install --upgrade pip
-        pip install buildozer cython
+        sudo apt-get clean
+        sudo rm -rf /usr/share/dotnet /opt/ghc
+        df -h
 
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential git ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good autoconf automake libtool pkg-config python3-dev
+        sudo apt-get install -y \
+          build-essential git ffmpeg wget \
+          libsdl2-dev libsdl2-image-dev \
+          libsdl2-mixer-dev libsdl2-ttf-dev \
+          libportmidi-dev libswscale-dev \
+          libavformat-dev libavcodec-dev \
+          zlib1g-dev libgstreamer1.0-0 \
+          gstreamer1.0-plugins-base \
+          gstreamer1.0-plugins-good \
+          autoconf libtool libtool-bin pkg-config \
+          unzip cmake libffi-dev \
+          python3-dev automake \
+          libssl-dev lld clang
 
-    - name: Set environment
+    - name: Install Python build tools
       run: |
-        echo "BUILDOZER_ALLOW_ROOT=1" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ACCEPT_LICENSES=true" >> $GITHUB_ENV
+        python -m pip install --upgrade pip
+        pip install --upgrade buildozer python-for-android
+        pip install "cython>=3.0.0,<3.1.0" "setuptools>=65.0.0,<70.0.0" wheel
 
-    - name: Accept Android SDK licenses
+    - name: Verify admin script exists
       run: |
-        export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
+        if [ ! -f "admin.py" ]; then
+          echo "❌ admin.py not found!"
+          exit 1
+        fi
 
-    - name: Build APK
+    - name: Create debug keystore
+      run: |
+        mkdir -p ~/.android
+        keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug, O=Android, C=US"
+
+    - name: Create buildozer.spec
+      run: |
+        cat > buildozer.spec << 'EOF'
+        [app]
+        title = TITAN Admin
+        package.name = titanadmin
+        package.domain = org.titan.admin
+        source.dir = .
+        source.main = admin.py
+        source.include_exts = py,png,jpg,kv,atlas,json
+        version = 0.1
+        requirements = python3,kivy
+        android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+        android.api = 33
+        android.minapi = 21
+        android.ndk_api = 21
+        android.ndk = 25c
+        android.accept_sdk_license = True
+        android.allow_insecure_keystore = True
+        android.archs = arm64-v8a
+        orientation = portrait
+        fullscreen = 0
+        log_level = 2
+        warn_on_root = 0
+
+        [buildozer]
+        log_level = 1
+        warn_on_root = 0
+        EOF
+
+    - name: Cache Buildozer global directory
+      uses: actions/cache@v4
+      with:
+        path: ~/.buildozer
+        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          ${{ runner.os }}-buildozer-
+
+    - name: Build APK with Buildozer
+      env:
+        BUILDOZER_ALLOW_ROOT: "1"
+        ANDROID_SDK_ACCEPT_LICENSES: "true"
+        DEBIAN_FRONTEND: "noninteractive"
+        CI: "true"
       run: buildozer -v android debug
 
-    - name: Upload APK
+    - name: Find APK
+      id: find_apk
+      run: |
+        APK_PATH=$(find . -name "*.apk" -type f | head -n 1)
+        if [ -n "$APK_PATH" ]; then
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "✅ APK found: $APK_PATH"
+        else
+          echo "❌ APK not found"
+          exit 1
+        fi
+
+    - name: Upload APK as Artifact
       uses: actions/upload-artifact@v4
       with:
         name: TITAN-Admin-APK
-        path: bin/*.apk
+        path: ${{ steps.find_apk.outputs.apk_path }}
+        retention-days: 30
