@@ -24,14 +24,9 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          build-essential git ffmpeg \
-          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-          autoconf automake libtool pkg-config python3-dev
+        sudo apt-get install -y build-essential git ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good autoconf automake libtool pkg-config python3-dev
 
-    - name: Set environment variables
+    - name: Set environment
       run: |
         echo "BUILDOZER_ALLOW_ROOT=1" >> $GITHUB_ENV
         echo "ANDROID_SDK_ACCEPT_LICENSES=true" >> $GITHUB_ENV
