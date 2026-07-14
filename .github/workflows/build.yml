@@ -53,6 +53,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade buildozer python-for-android
         pip install "cython<3.0" "setuptools>=65.0.0,<70.0.0" wheel
+        # Фикс для модуля cgi
+        pip install "Jinja2<3.1" "MarkupSafe<2.1"
 
     - name: Verify admin script exists
       run: |
@@ -77,7 +79,7 @@ jobs:
         source.main = admin.py
         source.include_exts = py,png,jpg,kv,atlas,json
         version = 0.1
-        requirements = python3,kivy==2.2.1
+        requirements = python3==3.11.15,kivy==2.2.1
         android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
         android.api = 33
         android.minapi = 21
@@ -85,7 +87,7 @@ jobs:
         android.ndk = 25c
         android.accept_sdk_license = True
         android.allow_insecure_keystore = True
-        android.archs = armeabi-v7a, arm64-v8a
+        android.archs = arm64-v8a
         orientation = portrait
         fullscreen = 0
         log_level = 2
@@ -122,7 +124,7 @@ jobs:
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "✅ APK found: $APK_PATH"
         else
-          echo "❌ APK not found"
+          echo " APK not found"
           exit 1
         fi
 
