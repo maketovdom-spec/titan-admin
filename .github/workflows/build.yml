@@ -8,7 +8,7 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    timeout-minutes: 240
 
     steps:
     - name: Checkout code
@@ -35,7 +35,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          build-essential git ffmpeg wget \
+          build-essential git ffmpeg wget ccache \
           libsdl2-dev libsdl2-image-dev \
           libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev \
@@ -48,30 +48,12 @@ jobs:
           python3-dev automake \
           libssl-dev lld clang
 
-    - name: Export Android SDK & NDK Environment
-      run: |
-        echo "ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_NDK_ROOT=" >> $GITHUB_ENV
-        echo "ANDROID_NDK_HOME=" >> $GITHUB_ENV
-        echo "ANDROID_NDK=" >> $GITHUB_ENV
-
     - name: Install Python build tools
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade buildozer python-for-android
-        pip install "cython>=3.0.0,<3.1.0" "setuptools>=65.0.0,<70.0.0" wheel
-
-    - name: Set root permission & accept licenses
-      run: |
-        echo "BUILDOZER_ALLOW_ROOT=1" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ACCEPT_LICENSES=true" >> $GITHUB_ENV
-
-    - name: Set non-interactive mode
-      run: |
-        echo "DEBIAN_FRONTEND=noninteractive" >> $GITHUB_ENV
-        echo "CI=true" >> $GITHUB_ENV
-        echo "BUILD_IN_CI=true" >> $GITHUB_ENV
+        # Оставляем <3.0, так как лог прямо сказал: buildozer 1.6.0 требует cython<3.0
+        pip install "cython<3.0" "setuptools>=65.0.0,<70.0.0" wheel
 
     - name: Verify admin script exists
       run: |
@@ -109,7 +91,8 @@ jobs:
         fullscreen = 0
         log_level = 2
         warn_on_root = 0
-        android.gradle_options = -Xmx2048m -XX:MaxPermSize=512m
+        # ⚠️ ВНИМАНИЕ: MaxPermSize УДАЛЕН, так как он ломает JDK 17!
+        android.gradle_options = -Xmx2048m
 
         [buildozer]
         log_level = 1
@@ -125,6 +108,12 @@ jobs:
           ${{ runner.os }}-buildozer-
 
     - name: Build APK
+      env:
+        BUILDOZER_ALLOW_ROOT: "1"
+        ANDROID_SDK_ACCEPT_LICENSES: "true"
+        DEBIAN_FRONTEND: "noninteractive"
+        CI: "true"
+        BUILD_IN_CI: "true"
       run: buildozer -v android debug
 
     - name: Find APK
@@ -145,3 +134,14 @@ jobs:
         name: TITAN-Admin-APK
         path: ${{ steps.find_apk.outputs.apk_path }}
         retention-days: 30
+
+    - name: Upload build logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          .buildozer/**/config.log
+          .buildozer/**/*.log
+          ~/.buildozer/**/*.log
+        retention-days: 7
