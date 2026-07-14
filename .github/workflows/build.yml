@@ -6,9 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
 
@@ -29,12 +28,16 @@ jobs:
           build-essential git ffmpeg \
           libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
-          gstreamer1.0-plugins-good openjdk-17-jdk \
-          autoconf automake libtool
+          zlib1g-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+          autoconf automake libtool pkg-config python3-dev
+
+    - name: Set environment variables
+      run: |
+        echo "BUILDOZER_ALLOW_ROOT=1" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ACCEPT_LICENSES=true" >> $GITHUB_ENV
 
     - name: Build APK
-      run: buildozer android debug
+      run: buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
